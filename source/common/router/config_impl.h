@@ -25,11 +25,11 @@ public:
    *        allows stable choices between calls if desired.
    * @return true if input headers match this object.
    */
-  virtual const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
+  virtual RoutePtr matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
 };
 
 class RouteEntryImplBase;
-typedef std::unique_ptr<RouteEntryImplBase> RouteEntryImplBasePtr;
+typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBasePtr;
 
 /**
  * Redirect entry that does an SSL redirect.
@@ -90,7 +90,7 @@ public:
   VirtualHostImpl(const Json::Object& virtual_host, Runtime::Loader& runtime,
                   Upstream::ClusterManager& cm);
 
-  const Route* getRouteFromEntries(const Http::HeaderMap& headers, uint64_t random_value) const;
+  RoutePtr getRouteFromEntries(const Http::HeaderMap& headers, uint64_t random_value) const;
   bool usesRuntime() const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
 
@@ -125,7 +125,7 @@ private:
   };
 
   static const CatchAllVirtualCluster VIRTUAL_CLUSTER_CATCH_ALL;
-  static const SslRedirectRoute SSL_REDIRECT_ROUTE;
+  static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
   const std::string name_;
   std::vector<RouteEntryImplBasePtr> routes_;
@@ -171,7 +171,11 @@ private:
 /**
  * Base implementation for all route entries.
  */
-class RouteEntryImplBase : public RouteEntry, public Matchable, public RedirectEntry, public Route {
+class RouteEntryImplBase : public RouteEntry,
+                           public Matchable,
+                           public RedirectEntry,
+                           public Route,
+                           public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
   RouteEntryImplBase(const VirtualHostImpl& vhost, const Json::Object& route,
                      Runtime::Loader& loader);
@@ -181,7 +185,7 @@ public:
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
-  const Route* clusterEntry(uint64_t random_value) const;
+  RoutePtr clusterEntry(uint64_t random_value) const;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -266,7 +270,7 @@ private:
     const uint64_t cluster_weight_;
   };
 
-  typedef std::unique_ptr<WeightedClusterEntry> WeightedClusterEntryPtr;
+  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntryPtr;
 
   static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
 
@@ -275,6 +279,7 @@ private:
 
   const VirtualHostImpl& vhost_;
   const std::string cluster_name_;
+  const std::string cluster_header_name_;
   const std::chrono::milliseconds timeout_;
   const Optional<RuntimeData> runtime_;
   Runtime::Loader& loader_;
@@ -300,7 +305,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  RoutePtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string prefix_;
@@ -318,7 +323,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  RoutePtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string path_;
@@ -332,7 +337,7 @@ class RouteMatcher {
 public:
   RouteMatcher(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm);
 
-  const Route* route(const Http::HeaderMap& headers, uint64_t random_value) const;
+  RoutePtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
   bool usesRuntime() const { return uses_runtime_; }
 
 private:
@@ -351,7 +356,7 @@ public:
   ConfigImpl(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm);
 
   // Router::Config
-  const Route* route(const Http::HeaderMap& headers, uint64_t random_value) const override {
+  RoutePtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
     return route_matcher_->route(headers, random_value);
   }
 
@@ -383,7 +388,7 @@ private:
 class NullConfigImpl : public Config {
 public:
   // Router::Config
-  const Route* route(const Http::HeaderMap&, uint64_t) const override { return nullptr; }
+  RoutePtr route(const Http::HeaderMap&, uint64_t) const override { return nullptr; }
 
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;

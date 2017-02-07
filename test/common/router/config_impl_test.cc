@@ -932,8 +932,8 @@ TEST(RouteMatcherTest, Redirect) {
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", false, false);
-    const Route* route = config.route(headers, 0);
-    EXPECT_EQ("https://www.lyft.com/foo", route->redirectEntry()->newPath(headers));
+    EXPECT_EQ("https://www.lyft.com/foo",
+              config.route(headers, 0)->redirectEntry()->newPath(headers));
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, true);

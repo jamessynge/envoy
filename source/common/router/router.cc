@@ -139,7 +139,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   config_.stats_.rq_total_.inc();
 
   // Determine if there is a route entry or a redirect for the request.
-  const Route* route = callbacks_->route();
+  RoutePtr route = callbacks_->route(); // fixfix store this.
   if (!route) {
     config_.stats_.no_route_.inc();
     stream_log_debug("no cluster match for URL '{}'", *callbacks_, headers.Path()->value().c_str());
@@ -160,13 +160,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // A route entry matches for the request.
   route_entry_ = route->routeEntry();
+  cluster_ = config_.cm_.get(route_entry_->clusterName());
+  if (!cluster_) {
+    ASSERT(false); // fixfix
+  }
 
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
   stream_log_debug("cluster '{}' match for URL '{}'", *callbacks_, route_entry_->clusterName(),
                    headers.Path()->value().c_str());
-
-  cluster_ = config_.cm_.get(route_entry_->clusterName());
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
