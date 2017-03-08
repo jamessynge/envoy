@@ -24,7 +24,16 @@ else
   EXTRA_CMAKE_FLAGS="-DENVOY_DEBUG:BOOL=OFF"
 fi
 
-mkdir -p build
+GIT_BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD || echo unknown)
+echo GIT_BRANCH_NAME=$GIT_BRANCH_NAME
+BRANCH_BUILD_DIR=build_for_branch_$GIT_BRANCH_NAME
+echo BRANCH_BUILD_DIR=$BRANCH_BUILD_DIR
+mkdir -p $BRANCH_BUILD_DIR
+if [[ -a build ]] ; then
+  rm -rf build
+fi
+ln -s $BRANCH_BUILD_DIR build
+ls -l build
 cd build
 
 cmake \

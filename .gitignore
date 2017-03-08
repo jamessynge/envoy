@@ -3,3 +3,4 @@
 /generated
 cscope.*
 BROWSE
+/build_for_branch_*
