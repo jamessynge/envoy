@@ -76,12 +76,14 @@ const std::string Utility::TCP_SCHEME = "tcp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
 
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
-  // TODO(mattklein123): IPv6 support.
   // TODO(mattklein123): We still support the legacy tcp:// and unix:// names. We should
   // support/parse ip:// and pipe:// as better names.
   if (url.find(TCP_SCHEME) == 0) {
-    return Address::InstanceConstSharedPtr{
-        new Address::Ipv4Instance(hostFromTcpUrl(url), portFromTcpUrl(url))};
+    auto addr = parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
+    if (addr == nullptr) {
+      throw EnvoyException(fmt::format("malformed tcp url: {}", url));
+    }
+    return addr;
   } else if (url.find(UNIX_SCHEME) == 0) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
@@ -209,10 +211,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
 
   if (status == 0) {
-    // TODO(mattklein123): IPv6 support
-    ASSERT(orig_addr.ss_family == AF_INET);
-    return Address::InstanceConstSharedPtr{
-        new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
+    return Address::addressFromSockAddr(orig_addr, addr_len);
   } else {
     return nullptr;
   }
