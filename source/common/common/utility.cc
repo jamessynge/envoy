@@ -107,6 +107,29 @@ std::vector<std::string> StringUtil::split(const std::string& source, const std:
   return ret;
 }
 
+std::vector<std::string> StringUtil::splitKeep(
+    const std::string& source, const std::string& split) {
+  std::vector<std::string> ret;
+  size_t last_index = 0;
+  size_t next_index;
+
+  if (split.empty()) {
+    ret.emplace_back(source);
+    return ret;
+  }
+
+  do {
+    next_index = source.find(split, last_index);
+    if (next_index == std::string::npos) {
+      next_index = source.size();
+    }
+    ret.emplace_back(subspan(source, last_index, next_index));
+    last_index = next_index + split.size();
+  } while (next_index != source.size());
+
+  return ret;
+}
+
 std::string StringUtil::subspan(const std::string& source, size_t start, size_t end) {
   return source.substr(start, end - start);
 }

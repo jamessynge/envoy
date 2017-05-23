@@ -110,6 +110,17 @@ TEST(StringUtil, split) {
   EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello", ""));
 }
 
+TEST(StringUtil, splitKeep) {
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split(",hello", ','));
+  EXPECT_EQ(std::vector<std::string>{}, StringUtil::split("", ","));
+  EXPECT_EQ(std::vector<std::string>{"a"}, StringUtil::split("a", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello,", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split(",hello", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello, ", ", "));
+  EXPECT_EQ(std::vector<std::string>{}, StringUtil::split(",,", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello", ""));
+}
+
 TEST(StringUtil, endsWith) {
   EXPECT_TRUE(StringUtil::endsWith("test", "st"));
   EXPECT_TRUE(StringUtil::endsWith("t", "t"));

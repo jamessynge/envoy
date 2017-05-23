@@ -13,6 +13,7 @@
 namespace Network {
 
 const std::string ProxyProtocol::ActiveConnection::PROXY_TCP4 = "PROXY TCP4 ";
+const std::string ProxyProtocol::ActiveConnection::PROXY_TCP6 = "PROXY TCP6 ";
 
 ProxyProtocol::ProxyProtocol(Stats::Scope& scope)
     : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {}
@@ -54,6 +55,85 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
     return;
   }
 
+  auto line_parts = StringUtil::splitKeep(proxy_line, " ");
+  uint64_t src_port, dst_port;
+  if (line_parts.size() == 6 && line_parts[0] == "PROXY" &&
+      StringUtil::atoul(line_parts[4], &src_port) &&
+      StringUtil::atoul(line_parts[5], &dst_port)) {
+    Network::Address::InstanceConstSharedPtr src_addr =
+        Network::Address::parseInternetAddress(line_parts[2]);
+    Network::Address::InstanceConstSharedPtr dst_addr =
+        Network::Address::parseInternetAddress(line_parts[3]);
+    if (src_addr != nullptr && dst_addr != nullptr && ) {
+      auto src_version = src_addr->ip()->version();
+      auto dst_version = dst_addr->ip()->version();
+      // TODO(jamessynge): It might be useful to have a utility function for "setting"
+      // the port in an address (i.e. creating a new Address::Instance with a different port).
+      if (src_version != dst_version) {
+        ;  // Broken input.
+      } else if (line_parts[1] == "TCP4" && src_version == Network::Address::IpVersion::v4) {
+        
+
+      }
+          dst_version == Network::Address::IpVersion::v4
+
+
+          (line_parts[1] == "TCP6" && version == Network::Address::IpVersion::v6)) {
+
+    }
+
+  }
+
+) {
+    Network::Address::InstanceConstSharedPtr source_addr =
+        Network::Address::parseInternetAddress(line_parts[2]);
+    if (source_addr != nullptr) {
+      auto version = source_addr->ip()->version();
+      // TODO(jamessynge): It might be useful to have a utility function for "setting"
+      // the port in an address (i.e. creating a new Address::Instance with a different port).
+      if ((line_parts[1] == "TCP4" && version == Network::Address::IpVersion::v4))
+          (line_parts[1] == "TCP6" && version == Network::Address::IpVersion::v6)) {
+        
+        
+
+  ListenerImpl& listener = listener_;
+  int fd = fd_;
+  fd_ = -1;
+
+  removeFromList(parent_.connections_);
+
+  // TODO(mattklein123): Parse the remote port instead of passing zero.
+  // TODO(mattklein123): IPv6 support.
+  listener.newConnection(fd, 
+                         Network::Address::InstanceConstSharedPtr{
+                             new Network::Address::Ipv4Instance(remote_address, 0)},
+                         listener_.socket().localAddress());
+
+    throw EnvoyException("failed to read proxy protocol");
+  }
+
+  uint64_t source_port
+  if (!StringUtil::atoul(line_parts[4], &source_port)) {
+    throw EnvoyException("failed to read proxy protocol");
+  }
+
+  Network::Address::InstanceConstSharedPtr source_addr =
+      Network::Address::parseInternetAddress(line_parts[2]);
+  if (source_addr
+
+  if (line_parts[1] == "TCP4" && source) {
+    
+    is_tcp4 = true;
+    
+  } else if (line_parts[1] == "TCP6") {
+    is_tcp6 = true;
+  } else {
+    throw EnvoyException("failed to read proxy protocol");
+  }
+
+
+
+uint64_t& out, int base = 10);
   if (proxy_line.find(PROXY_TCP4) != 0) {
     throw EnvoyException("failed to read proxy protocol");
   }

@@ -11,7 +11,12 @@
 #include <ifaddrs.h>
 #include <linux/netfilter_ipv4.h>
 
+using 
+
 namespace Network {
+using Address::Instance;
+using Address::InstanceConstSharedPtr;
+using Address::IpVersion;
 
 IpList::IpList(const std::vector<std::string>& subnets) {
   for (const std::string& entry : subnets) {
@@ -53,13 +58,13 @@ IpList::IpList(const std::vector<std::string>& subnets) {
   }
 }
 
-bool IpList::contains(const Address::Instance& address) const {
-  if (address.type() != Address::Type::Ip) {
+bool IpList::contains(const Instance& address) const {
+  if (address.type() != Address::Type::Ip || address.ip()->version() != IpVersion::v4) {
+    // TODO(mattklein123): IPv6 support
     return false;
   }
 
   for (const Ipv4Entry& entry : ipv4_list_) {
-    // TODO(mattklein123): IPv6 support
     if ((ntohl(address.ip()->ipv4()->address()) & entry.ipv4_mask_) == entry.ipv4_address_) {
       return true;
     }
@@ -75,7 +80,7 @@ IpList::IpList(const Json::Object& config, const std::string& member_name)
 const std::string Utility::TCP_SCHEME = "tcp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
 
-Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
+InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   // TODO(mattklein123): We still support the legacy tcp:// and unix:// names. We should
   // support/parse ip:// and pipe:// as better names.
   if (url.find(TCP_SCHEME) == 0) {
@@ -85,7 +90,7 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
     }
     return addr;
   } else if (url.find(UNIX_SCHEME) == 0) {
-    return Address::InstanceConstSharedPtr{
+    return InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
   } else {
     throw EnvoyException(fmt::format("unknown protocol scheme: {}", url));
@@ -124,10 +129,10 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   }
 }
 
-Address::InstanceConstSharedPtr Utility::getLocalAddress() {
+InstanceConstSharedPtr Utility::getLocalAddress() {
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;
-  Address::InstanceConstSharedPtr ret;
+  InstanceConstSharedPtr ret;
 
   int rc = getifaddrs(&ifaddr);
   RELEASE_ASSERT(!rc);
@@ -156,24 +161,31 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress() {
 }
 
 bool Utility::isInternalAddress(const char* address) {
-  in_addr addr;
-  int rc = inet_pton(AF_INET, address, &addr);
-  if (1 != rc) {
-    return false;
+  auto addr = Address::parseInternetAddress(address);
+  if (addr != nullptr) {
+    if (addr->ip()->version() == IpVersion::v4) {
+      uint32_t net_address = addr->ip()->v4()->address();
+      // Handle the RFC1918 space for IPV4. Also count loopback as internal.
+      uint8_t* address_bytes = reinterpret_cast<uint8_t*>(&net_address);
+      if ((address_bytes[0] == 10) || (address_bytes[0] == 192 && address_bytes[1] == 168) ||
+          (address_bytes[0] == 172 && address_bytes[1] >= 16 && address_bytes[1] <= 31) ||
+          addr.s_addr == htonl(INADDR_LOOPBACK)) {
+        return true;
+      }
+    } else {
+      ASSERT(addr->ip()->version() == IpVersion::v6);
+      if (*addr == *getIpv6LoopbackAddress()) {
+        return true;
+      }
+      // We *could* also check for matching fe80::/10 or fe80::/64 (link-local prefix or the one
+      // allocated subnet in the link-local prefix), but it isn't clear that folks will use that
+      // addressing scheme. Open for discussion.
+    }
   }
-
-  // Handle the RFC1918 space for IPV4. Also count loopback as internal.
-  uint8_t* address_bytes = reinterpret_cast<uint8_t*>(&addr.s_addr);
-  if ((address_bytes[0] == 10) || (address_bytes[0] == 192 && address_bytes[1] == 168) ||
-      (address_bytes[0] == 172 && address_bytes[1] >= 16 && address_bytes[1] <= 31) ||
-      addr.s_addr == htonl(INADDR_LOOPBACK)) {
-    return true;
-  }
-
   return false;
 }
 
-bool Utility::isLoopbackAddress(const Address::Instance& address) {
+bool Utility::isLoopbackAddress(const Instance& address) {
   if (address.type() != Address::Type::Ip) {
     return false;
   }
@@ -181,31 +193,65 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
   return address.ip()->ipv4()->address() == htonl(INADDR_LOOPBACK);
 }
 
-Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
+InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
   // Initialized on first call in a thread-safe manner.
-  static Address::InstanceConstSharedPtr loopback(new Address::Ipv4Instance("127.0.0.1", 0));
+  static InstanceConstSharedPtr loopback(new Address::Ipv4Instance("127.0.0.1", 0));
   return loopback;
 }
 
-Address::InstanceConstSharedPtr Utility::getIpv6LoopbackAddress() {
+InstanceConstSharedPtr Utility::getIpv6LoopbackAddress() {
   // Initialized on first call in a thread-safe manner.
-  static Address::InstanceConstSharedPtr loopback(new Address::Ipv6Instance("::1", 0));
+  static InstanceConstSharedPtr loopback(new Address::Ipv6Instance("::1", 0));
   return loopback;
 }
 
-Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress() {
+InstanceConstSharedPtr Utility::getIpv4AnyAddress() {
   // Initialized on first call in a thread-safe manner.
-  static Address::InstanceConstSharedPtr any(new Address::Ipv4Instance(static_cast<uint32_t>(0)));
+  static InstanceConstSharedPtr any(new Address::Ipv4Instance(static_cast<uint32_t>(0)));
   return any;
 }
 
-Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
+InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
   // Initialized on first call in a thread-safe manner.
-  static Address::InstanceConstSharedPtr any(new Address::Ipv6Instance(static_cast<uint32_t>(0)));
+  static InstanceConstSharedPtr any(new Address::Ipv6Instance(static_cast<uint32_t>(0)));
   return any;
 }
 
-Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
+InstanceConstSharedPtr Utility::combineIpAddressAndPort(const Address::Ip& address,
+                                                        uint16_t port) {
+  if (address.version() == IpVersion::v4) {
+    sockaddr_in sin;
+    sin.sin_family = AF_INET;
+    sin.sin_addr = address.ipv4()->address();  // This is in network order already.
+    sin.sin_port = htons(port);
+    return InstanceConstSharedPtr(new Address::Ipv4Instance(&sin));
+  } else {
+    ASSERT(addr->ip()->version() == IpVersion::v6);
+    sockaddr_in6 sin6;
+    sin6.sin6_family = AF_INET6;
+    sin6.sin6_port = htons(port);
+    sin6.sin6_addr = address.ipv4()->address();  // This is in network order already.
+    return InstanceConstSharedPtr(new Address::Ipv4Instance(sin6));
+
+
+  memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
+  ip_.ipv6_.address_.sin6_family = AF_INET6;
+  ip_.ipv6_.address_.sin6_port = htons(port);
+  if (!address.empty()) {
+    if (1 != inet_pton(AF_INET6, address.c_str(), &ip_.ipv6_.address_.sin6_addr)) {
+      throw EnvoyException(fmt::format("invalid ipv6 address '{}'", address));
+    }
+  } else {
+    ip_.ipv6_.address_.sin6_addr = in6addr_any;
+  }
+    sin.sin_family = AF_INET;
+    sin.sin_addr = address.ipv4()->address();  // This is in network order already.
+    sin.sin_port = htons(port);
+    return InstanceConstSharedPtr(new Address::Ipv4Instance(&sin));
+  }
+}
+
+InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
@@ -242,7 +288,7 @@ void Utility::parsePortRangeList(const std::string& string, std::list<PortRange>
   }
 }
 
-bool Utility::portInRangeList(const Address::Instance& address, const std::list<PortRange>& list) {
+bool Utility::portInRangeList(const Instance& address, const std::list<PortRange>& list) {
   if (address.type() != Address::Type::Ip) {
     return false;
   }

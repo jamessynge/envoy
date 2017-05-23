@@ -118,6 +118,14 @@ public:
   static Address::InstanceConstSharedPtr getIpv6AnyAddress();
 
   /**
+   * @return Address::InstanceConstSharedPtr an address instance that has the specified IP address
+   *         and port; this is equivalent to being able to set the port of an Address::Ip, but we
+   *         have defined Address objects as immutable.
+   */
+  static Address::InstanceConstSharedPtr combineIpAddressAndPort(const Address::Ip& address,
+                                                                 uint16_t port);
+
+  /**
    * Retrieve the original destination address from an accepted fd.
    * The address (IP and port) may be not local and the port may differ from
    * the listener port if the packets were redirected using iptables

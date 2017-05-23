@@ -100,6 +100,7 @@ public:
    * @param source supplies the string to split.
    * @param split supplies the char to split on.
    * @return vector of strings computed after splitting `source` around all instances of `split`.
+   *         Empty strings between split (i.e. instances of split are adjacent) are dropped.
    */
   static std::vector<std::string> split(const std::string& source, char split);
 
@@ -108,8 +109,19 @@ public:
    * @param source supplies the string to split.
    * @param split supplies the string to split on.
    * @return vector of strings computed after splitting `source` around all instances of `split`.
+   *         Empty strings between split (i.e. instances of split are adjacent) are dropped.
    */
   static std::vector<std::string> split(const std::string& source, const std::string& split);
+
+  /**
+   * Split a string.
+   * @param source supplies the string to split.
+   * @param split supplies the char to split on.
+   * @return vector of strings computed after splitting `source` around all instances of `split`.
+   *         Contains empty strings if the string starts or ends with 'split', or if instances
+   *         of 'split' are adjacent.
+   */
+  static std::vector<std::string> splitKeep(const std::string& source, const std::string& split);
 
   /**
    * Version of substr() that operates on a start and end index instead of a start index and a
