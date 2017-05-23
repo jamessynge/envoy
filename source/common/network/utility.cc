@@ -11,8 +11,6 @@
 #include <ifaddrs.h>
 #include <linux/netfilter_ipv4.h>
 
-using 
-
 namespace Network {
 using Address::Instance;
 using Address::InstanceConstSharedPtr;
